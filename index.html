@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev Mastery Tracker</title>
+<style>
+  :root {
+    --angular: #7C3AED; --angular-light: #EDE9FE; --angular-mid: #A78BFA;
+    --dotnet: #059669;  --dotnet-light: #D1FAE5; --dotnet-mid: #34D399;
+    --sql: #D97706;     --sql-light: #FEF3C7;   --sql-mid: #FBBF24;
+    --bg: #F8F9FB; --surface: #FFFFFF; --border: #E5E7EB; --border-strong: #D1D5DB;
+    --text: #111827; --text-2: #374151; --text-3: #6B7280; --text-4: #9CA3AF;
+    --code-bg: #1E1E2E; --code-text: #CDD6F4;
+    --radius: 10px; --radius-lg: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08); --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Auth screen ── */
+  #authScreen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); }
+  .auth-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:40px 36px; width:360px; text-align:center; box-shadow:var(--shadow-md); }
+  .auth-card .logo { font-size:36px; margin-bottom:12px; }
+  .auth-card h1 { font-size:20px; font-weight:600; margin-bottom:6px; }
+  .auth-card p { font-size:13px; color:var(--text-3); margin-bottom:28px; line-height:1.6; }
+  .google-btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:11px 20px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--surface); cursor:pointer; font-size:14px; font-weight:500; color:var(--text-2); transition:all 0.15s; }
+  .google-btn:hover { background:var(--bg); border-color:var(--angular); color:var(--text); }
+  .google-btn svg { width:18px; height:18px; flex-shrink:0; }
+  .auth-error { color:#DC2626; font-size:12px; margin-top:12px; display:none; }
+  .config-warning { background:#FEF3C7; border:1px solid var(--sql-mid); border-radius:var(--radius); padding:12px 14px; margin-bottom:20px; font-size:12px; color:#92400E; text-align:left; display:none; }
+  .config-warning code { background:#FDE68A; padding:1px 5px; border-radius:4px; font-family:monospace; }
+
+  /* ── Layout ── */
+  #app { display:none; grid-template-columns:240px 1fr; grid-template-rows:56px 1fr; min-height:100vh; }
+  #app.visible { display:grid; }
+  .topbar { grid-column:1/-1; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 20px; gap:12px; }
+  .topbar h1 { font-size:16px; font-weight:600; letter-spacing:-0.01em; }
+  .topbar .subtitle { font-size:12px; color:var(--text-3); margin-left:4px; }
+  .topbar-right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .streak-badge { background:#FEF3C7; color:#92400E; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px; }
+  .user-avatar { width:30px; height:30px; border-radius:50%; border:2px solid var(--border); cursor:pointer; object-fit:cover; }
+  .user-name { font-size:12px; color:var(--text-3); }
+  .signout-btn { font-size:12px; color:var(--text-3); background:none; border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; }
+  .signout-btn:hover { border-color:var(--border-strong); color:var(--text); }
+  .sync-indicator { font-size:11px; color:var(--text-4); display:flex; align-items:center; gap:5px; }
+  .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--dotnet); }
+  .sync-dot.syncing { background:var(--sql); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .sidebar { background:var(--surface); border-right:1px solid var(--border); padding:16px 0; overflow-y:auto; }
+  .nav-section { padding:0 12px; margin-bottom:4px; }
+  .nav-section-label { font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-4); padding:8px 8px 4px; }
+  .nav-item { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:7px; cursor:pointer; font-size:13px; color:var(--text-2); transition:background 0.12s; user-select:none; }
+  .nav-item:hover { background:var(--bg); }
+  .nav-item.active { background:var(--bg); color:var(--text); font-weight:500; }
+  .nav-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .nav-progress { margin-left:auto; font-size:11px; color:var(--text-4); }
+  .nav-mini-bar { height:3px; background:var(--border); border-radius:2px; margin:0 20px 8px; overflow:hidden; }
+  .nav-mini-fill { height:100%; border-radius:2px; transition:width 0.3s; }
+
+  .main { overflow-y:auto; padding:24px; }
+
+  /* ── Pages ── */
+  .page { display:none; }
+  .page.active { display:block; }
+  .page-title { font-size:20px; font-weight:600; margin-bottom:20px; letter-spacing:-0.02em; }
+
+  /* ── Dashboard ── */
+  .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px 18px; }
+  .stat-card .val { font-size:28px; font-weight:600; letter-spacing:-0.03em; line-height:1; }
+  .stat-card .lbl { font-size:12px; color:var(--text-3); margin-top:5px; }
+  .two-col { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:24px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px; }
+  .card-title { font-size:13px; font-weight:600; color:var(--text-2); margin-bottom:14px; }
+  .track-progress-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .track-label { font-size:12px; font-weight:500; width:80px; flex-shrink:0; }
+  .progress-bar { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+  .progress-pct { font-size:11px; color:var(--text-4); width:32px; text-align:right; flex-shrink:0; }
+  .today-topics { display:flex; flex-direction:column; gap:8px; }
+  .today-chip { display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--bg); border-radius:7px; font-size:12px; cursor:pointer; transition:background 0.12s; }
+  .today-chip:hover { background:var(--border); }
+  .today-chip .chip-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .heatmap-row { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:8px; }
+  .hm-cell { width:14px; height:14px; border-radius:2px; background:var(--border); flex-shrink:0; }
+  .hm-cell.l1 { background:var(--dotnet-light); } .hm-cell.l2 { background:var(--dotnet-mid); } .hm-cell.l3 { background:var(--dotnet); }
+  .hm-legend { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-3); }
+  .hm-legend .hm-cell { width:11px; height:11px; }
+
+  /* ── Curriculum ── */
+  .curriculum-filters { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  .filter-btn { padding:5px 14px; border-radius:20px; border:1px solid var(--border); font-size:12px; font-weight:500; cursor:pointer; background:var(--surface); color:var(--text-2); transition:all 0.12s; }
+  .filter-btn:hover { border-color:var(--border-strong); }
+  .filter-btn.active { border-color:transparent; }
+  .filter-btn.f-all.active { background:var(--text); color:#fff; }
+  .filter-btn.f-angular.active { background:var(--angular); color:#fff; border-color:var(--angular); }
+  .filter-btn.f-dotnet.active { background:var(--dotnet); color:#fff; border-color:var(--dotnet); }
+  .filter-btn.f-sql.active { background:var(--sql); color:#fff; border-color:var(--sql); }
+  .phase-group { margin-bottom:28px; }
+  .phase-heading { font-size:11px; font-weight:600; letter-spacing:0.07em; text-transform:uppercase; color:var(--text-4); margin-bottom:10px; padding-left:2px; }
+  .topic-list { display:flex; flex-direction:column; gap:6px; }
+  .topic-row { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:border-color 0.15s,box-shadow 0.15s; }
+  .topic-row:hover { border-color:var(--border-strong); box-shadow:var(--shadow); }
+  .topic-row.done { opacity:0.55; }
+  .topic-row .t-check { width:18px; height:18px; border-radius:50%; border:2px solid var(--border-strong); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; transition:all 0.15s; }
+  .topic-row.done .t-check { border-color:var(--dotnet); background:var(--dotnet); color:#fff; }
+  .topic-row .t-track-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .topic-row .t-title { font-size:13px; flex:1; }
+  .topic-row.done .t-title { text-decoration:line-through; }
+  .topic-row .t-desc { font-size:12px; color:var(--text-3); margin-top:2px; }
+  .topic-row .t-meta { display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0; }
+  .t-badge { font-size:10px; padding:2px 7px; border-radius:20px; font-weight:500; }
+  .t-badge.has-note { background:#EDE9FE; color:#5B21B6; }
+  .t-badge.has-code { background:#1E1E2E; color:#CDD6F4; }
+  .t-badge.has-link { background:#DBEAFE; color:#1E40AF; }
+  .topic-row .t-expand { color:var(--text-4); font-size:16px; transition:transform 0.2s; flex-shrink:0; }
+  .topic-row.expanded .t-expand { transform:rotate(180deg); }
+  .topic-detail { display:none; background:var(--bg); border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:16px; }
+  .topic-detail.open { display:block; }
+  .detail-tabs { display:flex; gap:4px; margin-bottom:14px; }
+  .detail-tab { padding:5px 12px; font-size:12px; border-radius:6px; border:1px solid transparent; cursor:pointer; color:var(--text-3); transition:all 0.12s; }
+  .detail-tab:hover { background:var(--surface); }
+  .detail-tab.active { background:var(--surface); border-color:var(--border); color:var(--text); font-weight:500; }
+  .detail-pane { display:none; }
+  .detail-pane.active { display:block; }
+  textarea.note-area { width:100%; min-height:100px; padding:10px 12px; font-size:13px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); resize:vertical; font-family:inherit; line-height:1.6; }
+  textarea.note-area:focus { outline:none; border-color:var(--angular); }
+  textarea.code-area { font-family:'Fira Code','Cascadia Code','Consolas',monospace; background:var(--code-bg); color:var(--code-text); min-height:140px; font-size:12.5px; line-height:1.7; }
+  .link-row { display:flex; align-items:center; gap:8px; }
+  .link-row input { flex:1; padding:7px 10px; font-size:12px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text); }
+  .link-row input:focus { outline:none; border-color:var(--angular); }
+  .link-row input.url-input { flex:2; }
+  .saved-links { display:flex; flex-direction:column; gap:6px; }
+  .saved-link-item { display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--surface); border:1px solid var(--border); border-radius:7px; }
+  .saved-link-item a { font-size:12px; color:#2563EB; text-decoration:none; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .saved-link-item a:hover { text-decoration:underline; }
+  .saved-link-label { font-size:11px; color:var(--text-3); flex-shrink:0; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .saved-link-item .del-btn { margin-left:auto; flex-shrink:0; }
+  .action-row { display:flex; gap:8px; margin-top:10px; align-items:center; }
+  .btn { padding:7px 16px; border-radius:7px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-2); transition:all 0.12s; }
+  .btn:hover { background:var(--bg); border-color:var(--border-strong); }
+  .btn.primary { background:var(--angular); color:#fff; border-color:var(--angular); }
+  .btn.primary:hover { opacity:0.88; }
+  .btn.mark-done { background:var(--dotnet-light); color:#065F46; border-color:var(--dotnet-mid); }
+  .del-btn { background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-3); cursor:pointer; padding:5px 8px; font-size:13px; transition:all 0.12s; }
+  .del-btn:hover { border-color:#EF4444; color:#EF4444; }
+  .save-msg { font-size:11px; color:var(--dotnet); margin-left:4px; opacity:0; transition:opacity 0.3s; }
+  .save-msg.show { opacity:1; }
+
+  /* ── Daily log ── */
+  .day-selector { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+  .day-selector input[type=date] { padding:7px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; background:var(--surface); color:var(--text); }
+  .day-selector input[type=date]:focus { outline:none; border-color:var(--angular); }
+  .daily-summary-area { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; margin-bottom:16px; }
+  .daily-summary-area label { font-size:12px; font-weight:500; color:var(--text-3); display:block; margin-bottom:6px; }
+  .daily-summary-area textarea { width:100%; min-height:90px; padding:9px 11px; font-size:13px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text); resize:vertical; font-family:inherit; line-height:1.6; }
+  .daily-summary-area textarea:focus { outline:none; border-color:var(--angular); background:var(--surface); }
+  .mood-row { display:flex; gap:8px; margin-top:10px; }
+  .mood-btn { font-size:20px; padding:6px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:all 0.12s; line-height:1; }
+  .mood-btn:hover { border-color:var(--angular); transform:scale(1.1); }
+  .mood-btn.selected { border-color:var(--angular); background:var(--angular-light); transform:scale(1.1); }
+  .mood-label { font-size:12px; color:var(--text-3); align-self:center; }
+  .completed-today { margin-top:16px; }
+  .completed-today-title { font-size:12px; font-weight:600; color:var(--text-3); margin-bottom:8px; }
+  .ct-row { display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--surface); border:1px solid var(--border); border-radius:7px; margin-bottom:6px; font-size:12px; }
+  .ct-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .ct-name { flex:1; }
+  .ct-track { font-size:10px; font-weight:500; padding:2px 7px; border-radius:20px; }
+
+  /* ── Calendar ── */
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:20px; }
+  .cal-day-hdr { text-align:center; font-size:11px; font-weight:600; color:var(--text-4); padding:4px 0; }
+  .cal-cell { aspect-ratio:1; border-radius:7px; border:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12px; cursor:pointer; transition:all 0.12s; }
+  .cal-cell:hover { border-color:var(--border-strong); }
+  .cal-cell.has-activity { background:var(--dotnet-light); border-color:var(--dotnet-mid); color:#065F46; font-weight:600; }
+  .cal-cell.today { border-color:var(--angular); border-width:2px; }
+  .cal-cell.other-month { opacity:0.3; }
+  .cal-cell .dots { display:flex; gap:2px; margin-top:2px; }
+  .cal-cell .dot { width:4px; height:4px; border-radius:50%; }
+  .cal-nav { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .cal-nav button { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:5px 10px; cursor:pointer; font-size:14px; color:var(--text-2); }
+  .cal-nav button:hover { background:var(--bg); }
+  .cal-nav .cal-month { font-size:14px; font-weight:600; flex:1; }
+
+  /* ── Toast ── */
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--text); color:#fff; padding:10px 18px; border-radius:var(--radius); font-size:13px; box-shadow:var(--shadow-md); transform:translateY(60px); opacity:0; transition:all 0.25s; z-index:1000; }
+  .toast.show { transform:translateY(0); opacity:1; }
+
+  .empty-state { text-align:center; padding:40px 20px; color:var(--text-3); font-size:13px; }
+  .search-input { width:100%; padding:9px 14px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; background:var(--surface); color:var(--text); margin-bottom:16px; }
+  .search-input:focus { outline:none; border-color:var(--angular); }
+  .loading-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; font-size:14px; color:var(--text-3); gap:10px; }
+  .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--angular); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  @media (max-width:900px) {
+    #app { grid-template-columns:1fr; }
+    .sidebar { display:none; }
+    .stats-grid { grid-template-columns:repeat(2,1fr); }
+    .two-col { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingScreen" class="loading-screen">
+  <div class="spinner"></div> Loading…
+</div>
+
+<!-- Auth Screen -->
+<div id="authScreen" style="display:none">
+  <div class="auth-card">
+    <div class="logo">🎯</div>
+    <h1>Dev Mastery Tracker</h1>
+    <p>Track your Angular, .NET & SQL Server learning journey. Sign in to sync your progress across all devices.</p>
+    <div class="config-warning" id="configWarning">
+      ⚠️ Firebase not configured yet. Open <code>index.html</code> and replace the <code>firebaseConfig</code> values with your own. See the <strong>SETUP GUIDE</strong> in the repo for instructions.
+    </div>
+    <button class="google-btn" onclick="signInWithGoogle()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <header class="topbar">
+    <span style="font-size:20px;">🎯</span>
+    <h1>Dev Mastery Tracker</h1>
+    <span class="subtitle">Angular · .NET · MS SQL Server</span>
+    <div class="topbar-right">
+      <div class="sync-indicator"><div class="sync-dot" id="syncDot"></div><span id="syncLabel">Synced</span></div>
+      <span class="streak-badge" id="streakBadge">🔥 0 day streak</span>
+      <span style="font-size:12px;color:var(--text-3)" id="todayDate"></span>
+      <img class="user-avatar" id="userAvatar" src="" alt="avatar" onerror="this.style.display='none'">
+      <span class="user-name" id="userName"></span>
+      <button class="signout-btn" onclick="doSignOut()">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="sidebar">
+    <div class="nav-section">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)">📊 Dashboard</div>
+      <div class="nav-item" onclick="showPage('calendar',this)">📅 Daily Log</div>
+      <div class="nav-item" onclick="showPage('curriculum',this)">📚 All Topics</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Tracks</div>
+      <div class="nav-item" onclick="showTrack('angular',this)">
+        <span class="nav-dot" style="background:var(--angular)"></span> Angular
+        <span class="nav-progress" id="nav-pct-angular">0%</span>
+      </div>
+      <div class="nav-mini-bar"><div class="nav-mini-fill" id="nav-bar-angular" style="background:var(--angular);width:0%"></div></div>
+      <div class="nav-item" onclick="showTrack('dotnet',this)">
+        <span class="nav-dot" style="background:var(--dotnet)"></span> .NET
+        <span class="nav-progress" id="nav-pct-dotnet">0%</span>
+      </div>
+      <div class="nav-mini-bar"><div class="nav-mini-fill" id="nav-bar-dotnet" style="background:var(--dotnet);width:0%"></div></div>
+      <div class="nav-item" onclick="showTrack('sql',this)">
+        <span class="nav-dot" style="background:var(--sql)"></span> MS SQL Server
+        <span class="nav-progress" id="nav-pct-sql">0%</span>
+      </div>
+      <div class="nav-mini-bar"><div class="nav-mini-fill" id="nav-bar-sql" style="background:var(--sql);width:0%"></div></div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="val" id="stat-total">114</div><div class="lbl">Total topics</div></div>
+        <div class="stat-card"><div class="val" style="color:var(--dotnet)" id="stat-done">0</div><div class="lbl">Completed</div></div>
+        <div class="stat-card"><div class="val" id="stat-left">114</div><div class="lbl">Remaining</div></div>
+        <div class="stat-card"><div class="val" id="stat-pct">0%</div><div class="lbl">Overall progress</div></div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">Progress by track</div>
+          <div class="track-progress-row">
+            <span class="track-label" style="color:var(--angular)">Angular</span>
+            <div class="progress-bar"><div class="progress-fill" id="pb-angular" style="background:var(--angular);width:0%"></div></div>
+            <span class="progress-pct" id="pp-angular">0%</span>
+          </div>
+          <div class="track-progress-row">
+            <span class="track-label" style="color:var(--dotnet)">.NET</span>
+            <div class="progress-bar"><div class="progress-fill" id="pb-dotnet" style="background:var(--dotnet);width:0%"></div></div>
+            <span class="progress-pct" id="pp-dotnet">0%</span>
+          </div>
+          <div class="track-progress-row">
+            <span class="track-label" style="color:var(--sql)">SQL Server</span>
+            <div class="progress-bar"><div class="progress-fill" id="pb-sql" style="background:var(--sql);width:0%"></div></div>
+            <span class="progress-pct" id="pp-sql">0%</span>
+          </div>
+          <div style="margin-top:18px;">
+            <div class="card-title">Activity heatmap (last 16 weeks)</div>
+            <div class="heatmap-row" id="heatmap"></div>
+            <div class="hm-legend">Less <div class="hm-cell"></div><div class="hm-cell l1"></div><div class="hm-cell l2"></div><div class="hm-cell l3"></div> More</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Today's topics</div>
+          <div class="today-topics" id="todayTopics"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Log -->
+    <div class="page" id="page-calendar">
+      <div class="page-title">Daily log</div>
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start">
+        <div>
+          <div class="day-selector">
+            <label style="font-size:13px;color:var(--text-3)">Date:</label>
+            <input type="date" id="logDate" onchange="loadDayLog()">
+          </div>
+          <div class="daily-summary-area">
+            <label>What did you learn today?</label>
+            <textarea id="dailySummary" placeholder="Write a brief summary — key insights, 'aha' moments, things to revisit..."></textarea>
+            <div class="mood-row">
+              <span class="mood-label">Session mood:</span>
+              <button class="mood-btn" onclick="setMood('😴')">😴</button>
+              <button class="mood-btn" onclick="setMood('😐')">😐</button>
+              <button class="mood-btn" onclick="setMood('😊')">😊</button>
+              <button class="mood-btn" onclick="setMood('🔥')">🔥</button>
+            </div>
+          </div>
+          <button class="btn primary" onclick="saveDayLog()">Save log</button>
+          <div class="completed-today" style="margin-top:20px">
+            <div class="completed-today-title">Topics completed on this day</div>
+            <div id="completedTodayList"></div>
+          </div>
+        </div>
+        <div>
+          <div class="cal-nav">
+            <button onclick="calPrev()">◀</button>
+            <span class="cal-month" id="calMonthLabel"></span>
+            <button onclick="calNext()">▶</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Curriculum -->
+    <div class="page" id="page-curriculum">
+      <div class="page-title" id="curriculumTitle">All topics</div>
+      <div class="curriculum-filters">
+        <button class="filter-btn f-all active" onclick="setCurrFilter('all',this)">All tracks</button>
+        <button class="filter-btn f-angular" onclick="setCurrFilter('angular',this)">Angular</button>
+        <button class="filter-btn f-dotnet" onclick="setCurrFilter('dotnet',this)">.NET</button>
+        <button class="filter-btn f-sql" onclick="setCurrFilter('sql',this)">SQL Server</button>
+        <button class="filter-btn" id="filterDone" onclick="toggleDoneFilter(this)">Hide completed</button>
+      </div>
+      <input class="search-input" type="text" id="searchInput" placeholder="Search topics..." oninput="renderCurriculum()">
+      <div id="curriculumList"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     FIREBASE CONFIG  — replace these 8 values with your own project's config
+     (Firebase Console → Project Settings → Your apps → SDK setup)
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp }           from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+                                   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot }
+                                   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ▼▼▼  REPLACE EVERYTHING INSIDE THIS OBJECT WITH YOUR OWN CONFIG  ▼▼▼ */
+const firebaseConfig = {
+  apiKey: "AIzaSyDs4qZDOibPrEtsB0CkcwQtOmdwv0xRLgw",
+  authDomain: "dev-mastery-tracker.firebaseapp.com",
+  projectId: "dev-mastery-tracker",
+  storageBucket: "dev-mastery-tracker.firebasestorage.app",
+  messagingSenderId: "385442024395",
+  appId: "1:385442024395:web:53308cceb34a94446d844e",
+  measurementId: "G-ZC3ZYBD8V1"
+};
+/* ▲▲▲  END OF CONFIG  ▲▲▲ */
+
+// ── Detect unconfigured state ─────────────────────────────────────────────────
+const isUnconfigured = firebaseConfig.apiKey === "YOUR_API_KEY";
+
+const app  = isUnconfigured ? null : initializeApp(firebaseConfig);
+const auth = isUnconfigured ? null : getAuth(app);
+const db   = isUnconfigured ? null : getFirestore(app);
+
+// ── Curriculum data ───────────────────────────────────────────────────────────
+const CURRICULUM = {
+  angular:[
+    {phase:'Phase 1 — Foundations',topics:[
+      {id:'a1',title:'Angular architecture overview',desc:'Modules, components, services, directives, pipes — the Angular mental model.'},
+      {id:'a2',title:'TypeScript essentials',desc:'Types, interfaces, generics, decorators, enums — Angular is TypeScript-first.'},
+      {id:'a3',title:'Angular CLI deep dive',desc:'ng new, ng generate, ng serve, ng build, workspaces, schematics.'},
+      {id:'a4',title:'Components & templates',desc:'Component class, metadata, interpolation, property & event binding.'},
+      {id:'a5',title:'Directives: structural & attribute',desc:'*ngIf, *ngFor, *ngSwitch, NgClass, NgStyle, custom directives.'},
+      {id:'a6',title:'Pipes: built-in & custom',desc:'DatePipe, CurrencyPipe, AsyncPipe, creating pure and impure custom pipes.'},
+      {id:'a7',title:'Component lifecycle hooks',desc:'ngOnInit, ngOnChanges, ngAfterViewInit, ngOnDestroy — when and why.'},
+      {id:'a8',title:'Input/Output & EventEmitter',desc:'@Input, @Output, component communication, ViewChild/ContentChild.'},
+      {id:'a9',title:'Angular Modules (NgModule)',desc:'Declarations, imports, exports, providers, feature & shared modules.'},
+      {id:'a10',title:'Routing & navigation basics',desc:'RouterModule, Routes, RouterLink, RouterOutlet, programmatic navigation.'},
+      {id:'a11',title:'Lazy loading & route guards',desc:'loadChildren, CanActivate, CanDeactivate, Resolve, protecting routes.'},
+      {id:'a12',title:'Services & Dependency Injection',desc:'Singleton services, providedIn root vs module, injection tokens.'},
+      {id:'a13',title:'Template-driven forms',desc:'NgModel, NgForm, validation, error messages.'},
+      {id:'a14',title:'Reactive forms',desc:'FormBuilder, FormGroup, FormControl, FormArray, Validators, custom validators.'},
+      {id:'a15',title:'HttpClient & interceptors',desc:'GET/POST/PUT/DELETE, headers, params, error handling, HTTP interceptors.'},
+    ]},
+    {phase:'Phase 2 — Intermediate',topics:[
+      {id:'a16',title:'RxJS fundamentals',desc:'Observables, Subjects, BehaviorSubject, of, from, switchMap, mergeMap, catchError.'},
+      {id:'a17',title:'RxJS operators deep dive',desc:'combineLatest, forkJoin, debounceTime, distinctUntilChanged, shareReplay, takeUntil.'},
+      {id:'a18',title:'State management with NgRx',desc:'Store, Actions, Reducers, Selectors, Effects — the Redux pattern in Angular.'},
+      {id:'a19',title:'NgRx Effects & Entity',desc:'Side effects, @ngrx/entity adapter for CRUD collections, DevTools.'},
+      {id:'a20',title:'Angular Material UI',desc:'MatModule setup, themes, Material components (table, dialog, snackbar).'},
+      {id:'a21',title:'CDK (Component Dev Kit)',desc:'Overlay, DragDrop, VirtualScroll, A11y.'},
+      {id:'a22',title:'Change detection strategy',desc:'Default vs OnPush, markForCheck, detectChanges, Zones.'},
+      {id:'a23',title:'Dynamic components',desc:'ComponentFactoryResolver, ViewContainerRef, runtime component creation.'},
+      {id:'a24',title:'Content projection & ng-template',desc:'ng-content, ng-template, ngTemplateOutlet, structural directive microsyntax.'},
+      {id:'a25',title:'Angular animations',desc:'BrowserAnimationsModule, trigger, state, transition, keyframes, animate.'},
+      {id:'a26',title:'Unit testing with Jasmine/Karma',desc:'TestBed, ComponentFixture, async/fakeAsync, spies.'},
+      {id:'a27',title:'E2E testing with Cypress',desc:'Writing E2E tests, selectors, fixtures, intercepts, CI integration.'},
+      {id:'a28',title:'Angular Universal (SSR)',desc:'Server-side rendering, hydration, transferState, SEO.'},
+      {id:'a29',title:'Performance optimization',desc:'Bundle analysis, tree-shaking, preloading strategies, trackBy, pure pipes.'},
+      {id:'a30',title:'Angular security',desc:'XSS sanitization, DomSanitizer, CSRF, CSP, auth tokens.'},
+    ]},
+    {phase:'Phase 3 — Advanced',topics:[
+      {id:'a31',title:'Standalone components (Angular 14+)',desc:'No NgModule needed — imports directly in component metadata.'},
+      {id:'a32',title:'Signals (Angular 17+)',desc:'signal(), computed(), effect() — new reactive primitives.'},
+      {id:'a33',title:'Custom schematics',desc:'Building CLI schematics to generate project-specific code patterns.'},
+      {id:'a34',title:'Micro-frontends with Module Federation',desc:'Webpack Module Federation, sharing libraries, independent deployments.'},
+      {id:'a35',title:'PWA with Angular',desc:'@angular/pwa, service workers, caching strategies, Web App Manifest.'},
+      {id:'a36',title:'Internationalization (i18n)',desc:'Angular i18n, @ngx-translate, locale-aware pipes, RTL support.'},
+      {id:'a37',title:'Monorepo with Nx',desc:'Nx workspace, affected commands, code generators, shared libraries.'},
+      {id:'a38',title:'Advanced routing patterns',desc:'Auxiliary routes, router events, scroll restoration, route reuse.'},
+      {id:'a39',title:'CI/CD for Angular apps',desc:'Build/test/lint in CI, deploying to Nginx / Azure Static Web Apps.'},
+      {id:'a40',title:'Design patterns in Angular',desc:'Facade pattern, smart/dumb components, container pattern, repository.'},
+    ]}
+  ],
+  dotnet:[
+    {phase:'Phase 1 — Foundations',topics:[
+      {id:'d1',title:'C# language fundamentals',desc:'Types, OOP, records, tuples, pattern matching, null handling.'},
+      {id:'d2',title:'.NET ecosystem & SDK',desc:'.NET 8 runtime, SDK, CLI (dotnet new/run/build/publish), NuGet.'},
+      {id:'d3',title:'ASP.NET Core architecture',desc:'Middleware pipeline, WebApplication builder, request lifecycle, Kestrel vs IIS.'},
+      {id:'d4',title:'Minimal APIs',desc:'MapGet/Post/Put/Delete, route parameters, model binding, TypedResults.'},
+      {id:'d5',title:'Controllers & Web API',desc:'[ApiController], [Route], action results, model validation, content negotiation.'},
+      {id:'d6',title:'Dependency Injection in .NET',desc:'Service lifetimes (Scoped/Transient/Singleton), IServiceCollection.'},
+      {id:'d7',title:'Configuration & Options pattern',desc:'appsettings.json, environment variables, IConfiguration, IOptions<T>.'},
+      {id:'d8',title:'Middleware & request pipeline',desc:'Writing custom middleware, order, short-circuiting, UseWhen/MapWhen.'},
+      {id:'d9',title:'Entity Framework Core basics',desc:'DbContext, DbSet, Code First migrations, basic CRUD.'},
+      {id:'d10',title:'EF Core relationships',desc:'One-to-many, many-to-many, owned entities, navigation properties.'},
+      {id:'d11',title:'LINQ (Language Integrated Query)',desc:'Where, Select, OrderBy, GroupBy, Join, deferred execution.'},
+      {id:'d12',title:'Authentication with JWT',desc:'AddAuthentication, JwtBearer, generating tokens, claims, refresh tokens.'},
+      {id:'d13',title:'Authorization: roles & policies',desc:'[Authorize], role-based auth, policy-based auth, resource-based.'},
+      {id:'d14',title:'Logging & diagnostics',desc:'ILogger<T>, Serilog, structured logging, log levels, correlation IDs.'},
+      {id:'d15',title:'Error handling & problem details',desc:'UseExceptionHandler, ProblemDetails (RFC 7807), global exception filters.'},
+    ]},
+    {phase:'Phase 2 — Intermediate',topics:[
+      {id:'d16',title:'Repository & Unit of Work pattern',desc:'Abstract data access, IRepository<T>, IUnitOfWork, testability.'},
+      {id:'d17',title:'CQRS with MediatR',desc:'Commands, queries, handlers, IRequest/IRequestHandler, pipeline behaviors.'},
+      {id:'d18',title:'FluentValidation',desc:'AbstractValidator<T>, rule chaining, async validators.'},
+      {id:'d19',title:'AutoMapper',desc:'Profile, CreateMap, ProjectTo with EF Core, custom converters.'},
+      {id:'d20',title:'Background services & Hangfire',desc:'IHostedService, BackgroundService, Hangfire for scheduled/recurring jobs.'},
+      {id:'d21',title:'Caching strategies',desc:'IMemoryCache, IDistributedCache, Redis, response/output cache.'},
+      {id:'d22',title:'SignalR for real-time',desc:'Hubs, groups, typed clients, connection management, Angular integration.'},
+      {id:'d23',title:'File handling & storage',desc:'IFormFile uploads, streaming large files, Azure Blob Storage.'},
+      {id:'d24',title:'Email & notifications',desc:'MailKit/MimeKit, SendGrid SDK, background email queue.'},
+      {id:'d25',title:'API versioning',desc:'URL, header, query string versioning with Asp.Versioning.'},
+      {id:'d26',title:'Swagger / OpenAPI documentation',desc:'Swashbuckle, XML comments, security definitions, NSwag codegen.'},
+      {id:'d27',title:'Unit testing with xUnit & Moq',desc:'Arrange-Act-Assert, mocking, InMemory DB, FluentAssertions.'},
+      {id:'d28',title:'Integration testing in ASP.NET Core',desc:'WebApplicationFactory, TestServer, seeding test data.'},
+      {id:'d29',title:'gRPC in .NET',desc:'Protobuf contracts, Grpc.AspNetCore, unary & streaming calls.'},
+      {id:'d30',title:'Health checks & readiness probes',desc:'AddHealthChecks, custom health check, Kubernetes probes.'},
+    ]},
+    {phase:'Phase 3 — Advanced',topics:[
+      {id:'d31',title:'Clean Architecture in .NET',desc:'Domain, Application, Infrastructure, Presentation layers, dependency rule.'},
+      {id:'d32',title:'Domain-Driven Design basics',desc:'Aggregates, entities, value objects, domain events, bounded contexts.'},
+      {id:'d33',title:'Microservices patterns',desc:'API Gateway, sidecar, circuit breaker (Polly), service discovery.'},
+      {id:'d34',title:'Message queues with RabbitMQ/Azure SB',desc:'Producers, consumers, MassTransit, saga pattern.'},
+      {id:'d35',title:'Docker & container deployment',desc:'Dockerfile for .NET, multi-stage builds, docker-compose.'},
+      {id:'d36',title:'Kubernetes deployment',desc:'Deployment, Service, Ingress, ConfigMaps/Secrets for .NET apps.'},
+      {id:'d37',title:'CI/CD with GitHub Actions',desc:'Build, test, publish, push image, deploy to Azure App Service / AKS.'},
+      {id:'d38',title:'Performance tuning in .NET',desc:'BenchmarkDotNet, Span<T>, ArrayPool, ValueTask, zero-allocation.'},
+      {id:'d39',title:'Security hardening',desc:'OWASP Top 10 in .NET, rate limiting, CORS, HTTPS enforcement.'},
+      {id:'d40',title:'Observability & distributed tracing',desc:'OpenTelemetry SDK, Jaeger/Zipkin traces, Prometheus metrics, Grafana.'},
+    ]}
+  ],
+  sql:[
+    {phase:'Phase 1 — Foundations',topics:[
+      {id:'s1',title:'SQL Server architecture overview',desc:'Instances, databases, files/filegroups, buffer pool, SQL Server services.'},
+      {id:'s2',title:'SQL Server installation & SSMS',desc:'Editions (Express→Enterprise), SSMS features, connecting, object explorer.'},
+      {id:'s3',title:'T-SQL: DDL — CREATE, ALTER, DROP',desc:'CREATE TABLE, column constraints, ALTER TABLE, DROP, schemas, naming.'},
+      {id:'s4',title:'T-SQL: DML — SELECT deep dive',desc:'WHERE, ORDER BY, TOP, DISTINCT, CASE expressions, NULL handling.'},
+      {id:'s5',title:'JOINs: INNER, LEFT, RIGHT, FULL, CROSS',desc:'Set theory, self-joins, cross joins, join order performance.'},
+      {id:'s6',title:'Aggregations & GROUP BY',desc:'COUNT, SUM, AVG, MIN, MAX, GROUP BY, HAVING, ROLLUP, CUBE.'},
+      {id:'s7',title:'Subqueries & CTEs',desc:'Correlated subqueries, WITH (CTE), recursive CTEs for hierarchies.'},
+      {id:'s8',title:'Window functions',desc:'ROW_NUMBER, RANK, LEAD, LAG, FIRST_VALUE, PARTITION BY, OVER.'},
+      {id:'s9',title:'Indexes: clustered & non-clustered',desc:'B-tree structure, heap vs clustered, covering indexes, filtered.'},
+      {id:'s10',title:'Stored procedures',desc:'CREATE PROCEDURE, parameters, TRY/CATCH error handling, EXEC.'},
+      {id:'s11',title:'Functions: scalar, TVF, inline TVF',desc:'Scalar UDFs (pitfalls), table-valued functions, inline TVFs.'},
+      {id:'s12',title:'Triggers',desc:'AFTER vs INSTEAD OF triggers, inserted/deleted tables.'},
+    ]},
+    {phase:'Phase 2 — Intermediate',topics:[
+      {id:'s13',title:'Transactions & ACID properties',desc:'BEGIN/COMMIT/ROLLBACK, savepoints, isolation levels.'},
+      {id:'s14',title:'Locking & blocking',desc:'Shared, exclusive, intent locks, deadlocks, NOLOCK hints.'},
+      {id:'s15',title:'Read committed snapshot isolation',desc:'SNAPSHOT isolation, row versioning in tempdb, optimistic concurrency.'},
+      {id:'s16',title:'Execution plans',desc:'Reading graphical/XML plans, seek vs scan, key lookup, hash join.'},
+      {id:'s17',title:'Query optimization strategies',desc:'SARGability, implicit conversions, parameter sniffing, hints.'},
+      {id:'s18',title:'Statistics & cardinality',desc:'Auto-create/update stats, UPDATE STATISTICS, DBCC SHOW_STATISTICS.'},
+      {id:'s19',title:'Normalization (1NF–3NF, BCNF)',desc:'Normal forms with practical examples, denormalization trade-offs.'},
+      {id:'s20',title:'Schema design patterns',desc:'Star schema, EAV anti-pattern, soft delete, audit tables.'},
+      {id:'s21',title:'Views: standard & indexed',desc:'Encapsulation via views, schema binding, indexed (materialized) views.'},
+      {id:'s22',title:'Database security',desc:'Principals, GRANT/DENY/REVOKE, schemas, row-level security.'},
+      {id:'s23',title:'Backup & restore strategies',desc:'Full, differential, log backups, recovery models, point-in-time restore.'},
+      {id:'s24',title:'SQL Server Agent & jobs',desc:'Creating jobs, steps, schedules, alerts, operators.'},
+    ]},
+    {phase:'Phase 3 — Advanced',topics:[
+      {id:'s25',title:'Partitioning tables & indexes',desc:'Partition function, partition scheme, sliding window, partition elimination.'},
+      {id:'s26',title:'Columnstore indexes',desc:'Clustered vs non-clustered columnstore, batch mode, analytics workloads.'},
+      {id:'s27',title:'In-Memory OLTP (Hekaton)',desc:'Memory-optimized tables, natively compiled procedures, hash indexes.'},
+      {id:'s28',title:'Temporal tables',desc:'System-versioned temporal tables, FOR SYSTEM_TIME, time-travel queries.'},
+      {id:'s29',title:'JSON & XML support',desc:'FOR JSON, OPENJSON, JSON_VALUE/JSON_QUERY, FOR XML, hybrid models.'},
+      {id:'s30',title:'Full-text search',desc:'Full-text catalogs, CONTAINS, FREETEXT, language-aware tokenization.'},
+      {id:'s31',title:'High availability: Always On AG',desc:'Availability Groups, sync/async replicas, automatic failover.'},
+      {id:'s32',title:'Replication & CDC',desc:'Transactional replication, merge replication, Change Data Capture.'},
+      {id:'s33',title:'Dynamic Management Views (DMVs)',desc:'sys.dm_exec_requests, dm_os_wait_stats, dm_db_index_usage_stats.'},
+      {id:'s34',title:'Performance monitoring & tuning',desc:'Extended Events, Wait Statistics, PerfMon counters, Query Store.'},
+    ]}
+  ]
+};
+
+const TRACK_INFO = {
+  angular:{label:'Angular',color:'#7C3AED',light:'#EDE9FE',total:40},
+  dotnet: {label:'.NET',   color:'#059669',light:'#D1FAE5',total:40},
+  sql:    {label:'SQL',    color:'#D97706',light:'#FEF3C7',total:34}
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let state = { done:{}, notes:{}, dayLogs:{} };
+let currentUid = null;
+let saveTimer = null;
+let unsubSnap = null;
+
+// ── Firestore helpers ─────────────────────────────────────────────────────────
+function userDocRef(uid) { return doc(db, 'users', uid); }
+
+function setSyncing(val) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (!dot) return;
+  dot.classList.toggle('syncing', val);
+  lbl.textContent = val ? 'Saving…' : 'Synced';
+}
+
+async function saveToFirestore() {
+  if (!currentUid || !db) return;
+  setSyncing(true);
+  try {
+    await setDoc(userDocRef(currentUid), state);
+  } catch(e) { showToast('Save failed: ' + e.message); }
+  setSyncing(false);
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToFirestore, 1200);
+}
+
+function subscribeToChanges(uid) {
+  if (unsubSnap) unsubSnap();
+  unsubSnap = onSnapshot(userDocRef(uid), snap => {
+    if (snap.exists()) {
+      state = snap.data();
+      renderDashboard();
+      renderCurriculum();
+    }
+  });
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+window.signInWithGoogle = async function() {
+  if (isUnconfigured) {
+    document.getElementById('configWarning').style.display = 'block';
+    return;
+  }
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    const el = document.getElementById('authError');
+    el.textContent = e.message;
+    el.style.display = 'block';
+  }
+};
+
+window.doSignOut = async function() {
+  if (unsubSnap) unsubSnap();
+  await signOut(auth);
+};
+
+if (auth) {
+  onAuthStateChanged(auth, async user => {
+    document.getElementById('loadingScreen').style.display = 'none';
+    if (user) {
+      currentUid = user.uid;
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('app').classList.add('visible');
+      document.getElementById('userAvatar').src = user.photoURL || '';
+      document.getElementById('userName').textContent = user.displayName || '';
+      // Load initial data
+      const snap = await getDoc(userDocRef(user.uid));
+      if (snap.exists()) state = snap.data();
+      subscribeToChanges(user.uid);
+      initApp();
+    } else {
+      currentUid = null;
+      document.getElementById('app').classList.remove('visible');
+      document.getElementById('authScreen').style.display = 'flex';
+      if (isUnconfigured) document.getElementById('configWarning').style.display = 'block';
+    }
+  });
+} else {
+  // Unconfigured — show auth screen with warning
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('configWarning').style.display = 'block';
+}
+
+// ── App init ──────────────────────────────────────────────────────────────────
+function initApp() {
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  renderDashboard();
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+let currFilter='all', hideDone=false, activeTopicId=null, activeDetailTab={};
+
+window.showPage = function(name, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name==='dashboard') renderDashboard();
+  if (name==='curriculum') { currFilter='all'; hideDone=false; document.getElementById('curriculumTitle').textContent='All topics'; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.filter-btn.f-all').classList.add('active'); renderCurriculum(); }
+  if (name==='calendar') initCalendar();
+};
+
+window.showTrack = function(track, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-curriculum').classList.add('active');
+  if (el) el.classList.add('active');
+  currFilter=track; hideDone=false;
+  document.getElementById('curriculumTitle').textContent=TRACK_INFO[track].label+' topics';
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.filter-btn.f-'+track).classList.add('active');
+  renderCurriculum();
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function allTopics() {
+  const list=[];
+  for(const [track,phases] of Object.entries(CURRICULUM))
+    for(const phase of phases)
+      for(const t of phase.topics) list.push({...t,track,phase:phase.phase});
+  return list;
+}
+function topicById(id) { return allTopics().find(t=>t.id===id); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let toastTimer;
+function showToast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const all=allTopics(), total=all.length, done=Object.keys(state.done||{}).length;
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-done').textContent=done;
+  document.getElementById('stat-left').textContent=total-done;
+  document.getElementById('stat-pct').textContent=Math.round(done/total*100)+'%';
+  for(const [track,info] of Object.entries(TRACK_INFO)) {
+    const t=allTopics().filter(x=>x.track===track);
+    const d=t.filter(x=>(state.done||{})[x.id]).length;
+    const pct=Math.round(d/t.length*100);
+    document.getElementById('pb-'+track).style.width=pct+'%';
+    document.getElementById('pp-'+track).textContent=pct+'%';
+    document.getElementById('nav-pct-'+track).textContent=pct+'%';
+    document.getElementById('nav-bar-'+track).style.width=pct+'%';
+  }
+  document.getElementById('streakBadge').textContent='🔥 '+calcStreak()+' day streak';
+  const undone=allTopics().filter(t=>!(state.done||{})[t.id]);
+  const todayEl=document.getElementById('todayTopics');
+  if(!undone.length){todayEl.innerHTML='<div class="empty-state">🎉 All topics completed!</div>';return;}
+  const picks=[];
+  for(const track of ['angular','dotnet','sql']){const t=undone.find(x=>x.track===track);if(t&&picks.length<3)picks.push(t);}
+  todayEl.innerHTML=picks.map(t=>`<div class="today-chip" onclick="openTopic('${t.id}')"><span class="chip-dot" style="background:${TRACK_INFO[t.track].color}"></span><span style="flex:1;font-size:12px">${t.title}</span><span style="font-size:10px;color:var(--text-4)">${TRACK_INFO[t.track].label}</span></div>`).join('');
+  renderHeatmap();
+}
+
+function renderHeatmap() {
+  const el=document.getElementById('heatmap'); if(!el)return;
+  const today=new Date(); const cells=[];
+  for(let i=111;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const key=d.toISOString().slice(0,10);
+    const count=Object.values(state.done||{}).filter(v=>v===key).length;
+    const cls=count===0?'':count<2?'l1':count<4?'l2':'l3';
+    cells.push(`<div class="hm-cell ${cls}" title="${key}: ${count} topics"></div>`);
+  }
+  el.innerHTML=cells.join('');
+}
+
+function calcStreak() {
+  const dates=new Set(Object.values(state.done||{}).filter(Boolean));
+  let streak=0, d=new Date();
+  while(true){
+    const key=d.toISOString().slice(0,10);
+    if(dates.has(key)||(state.dayLogs&&state.dayLogs[key]&&state.dayLogs[key].summary)){streak++;d.setDate(d.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+
+// ── Curriculum ────────────────────────────────────────────────────────────────
+window.setCurrFilter = function(f,btn){ currFilter=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCurriculum(); };
+window.toggleDoneFilter = function(btn){ hideDone=!hideDone; btn.textContent=hideDone?'Show completed':'Hide completed'; btn.style.background=hideDone?'var(--text)':''; btn.style.color=hideDone?'#fff':''; renderCurriculum(); };
+
+function renderCurriculum() {
+  const search=(document.getElementById('searchInput').value||'').toLowerCase();
+  const container=document.getElementById('curriculumList');
+  const tracks=currFilter==='all'?['angular','dotnet','sql']:[currFilter];
+  let html='';
+  for(const track of tracks){
+    for(const phase of CURRICULUM[track]){
+      const filtered=phase.topics.filter(t=>{
+        if(hideDone&&(state.done||{})[t.id])return false;
+        if(search&&!t.title.toLowerCase().includes(search)&&!t.desc.toLowerCase().includes(search))return false;
+        return true;
+      });
+      if(!filtered.length)continue;
+      html+=`<div class="phase-group"><div class="phase-heading">${TRACK_INFO[track].label} · ${phase.phase}</div><div class="topic-list">`;
+      for(const t of filtered){
+        const isDone=!!(state.done||{})[t.id];
+        const nd=(state.notes||{})[t.id]||{};
+        const badges=[nd.note?'<span class="t-badge has-note">note</span>':'',nd.code?'<span class="t-badge has-code">code</span>':'',(nd.links&&nd.links.length)?`<span class="t-badge has-link">${nd.links.length} link${nd.links.length>1?'s':''}</span>`:''].filter(Boolean).join('');
+        const isExp=activeTopicId===t.id;
+        html+=`<div><div class="topic-row${isDone?' done':''}${isExp?' expanded':''}" id="row-${t.id}" onclick="toggleTopic('${t.id}')"><div class="t-check">${isDone?'✓':''}</div><div class="t-track-dot" style="background:${TRACK_INFO[track].color}"></div><div style="flex:1"><div class="t-title">${t.title}</div><div class="t-desc">${t.desc}</div></div><div class="t-meta">${badges}</div><div class="t-expand">▼</div></div><div class="topic-detail${isExp?' open':''}" id="detail-${t.id}">${isExp?renderTopicDetail(t,track):''}</div></div>`;
+      }
+      html+=`</div></div>`;
+    }
+  }
+  container.innerHTML=html||'<div class="empty-state">No topics match your filters.</div>';
+}
+
+function renderTopicDetail(t, track) {
+  const nd=(state.notes||{})[t.id]||{};
+  const dtab=activeDetailTab[t.id]||'notes';
+  const tabs=['notes','code','links'].map(tab=>`<button class="detail-tab${dtab===tab?' active':''}" onclick="switchDetailTab('${t.id}','${tab}',event)">${tab.charAt(0).toUpperCase()+tab.slice(1)}</button>`).join('');
+  const savedLinks=(nd.links||[]).map((l,i)=>`<div class="saved-link-item"><span class="saved-link-label">${escHtml(l.label||'Link')}</span><a href="${escHtml(l.url)}" target="_blank" rel="noopener">${escHtml(l.url)}</a><button class="del-btn" onclick="deleteLink('${t.id}',${i},event)">✕</button></div>`).join('');
+  return `<div class="detail-tabs">${tabs}</div>
+    <div class="detail-pane${dtab==='notes'?' active':''}" id="dp-notes-${t.id}">
+      <textarea class="note-area" id="note-${t.id}" placeholder="Notes, key concepts, gotchas, personal insights...">${escHtml(nd.note||'')}</textarea>
+      <div class="action-row"><button class="btn primary" onclick="saveNote('${t.id}',event)">Save note</button><button class="btn mark-done" onclick="markDone('${t.id}',event)">${(state.done||{})[t.id]?'Mark undone':'Mark as done'}</button><span class="save-msg" id="msg-${t.id}">Saved ✓</span></div>
+    </div>
+    <div class="detail-pane${dtab==='code'?' active':''}" id="dp-code-${t.id}">
+      <textarea class="note-area code-area" id="code-${t.id}" placeholder="// Paste code snippets, examples, key patterns...">${escHtml(nd.code||'')}</textarea>
+      <div class="action-row"><button class="btn primary" onclick="saveCode('${t.id}',event)">Save snippet</button><span class="save-msg" id="cmsg-${t.id}">Saved ✓</span></div>
+    </div>
+    <div class="detail-pane${dtab==='links'?' active':''}" id="dp-links-${t.id}">
+      <div class="saved-links" id="links-saved-${t.id}">${savedLinks}</div>
+      <div style="margin-top:10px"><div class="link-row"><input type="text" id="link-label-${t.id}" placeholder="Label (e.g. GitHub repo, Docs)"><input type="url" id="link-url-${t.id}" class="url-input" placeholder="https://..."><button class="btn primary" onclick="addLink('${t.id}',event)">Add</button></div></div>
+    </div>`;
+}
+
+window.toggleTopic = function(id){
+  if(activeTopicId===id)activeTopicId=null; else activeTopicId=id;
+  renderCurriculum();
+  if(activeTopicId) setTimeout(()=>{const el=document.getElementById('row-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});},50);
+};
+
+window.openTopic = function(id){
+  showPage('curriculum',null);
+  const t=topicById(id); if(!t)return;
+  currFilter=t.track;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.filter-btn.f-'+t.track).classList.add('active');
+  activeTopicId=id; renderCurriculum();
+  setTimeout(()=>{const el=document.getElementById('row-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},100);
+};
+
+window.switchDetailTab = function(id,tab,e){
+  e.stopPropagation(); activeDetailTab[id]=tab;
+  const detail=document.getElementById('detail-'+id);
+  detail.querySelectorAll('.detail-tab').forEach(b=>b.classList.remove('active')); e.target.classList.add('active');
+  detail.querySelectorAll('.detail-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('dp-'+tab+'-'+id).classList.add('active');
+};
+
+window.saveNote = function(id,e){
+  e.stopPropagation();
+  if(!state.notes)state.notes={};
+  if(!state.notes[id])state.notes[id]={};
+  state.notes[id].note=document.getElementById('note-'+id).value;
+  scheduleSave(); flashMsg('msg-'+id);
+};
+
+window.saveCode = function(id,e){
+  e.stopPropagation();
+  if(!state.notes)state.notes={};
+  if(!state.notes[id])state.notes[id]={};
+  state.notes[id].code=document.getElementById('code-'+id).value;
+  scheduleSave(); flashMsg('cmsg-'+id);
+};
+
+window.addLink = function(id,e){
+  e.stopPropagation();
+  const label=document.getElementById('link-label-'+id).value.trim();
+  const url=document.getElementById('link-url-'+id).value.trim();
+  if(!url)return;
+  if(!state.notes)state.notes={};
+  if(!state.notes[id])state.notes[id]={};
+  if(!state.notes[id].links)state.notes[id].links=[];
+  state.notes[id].links.push({label:label||url,url});
+  scheduleSave(); showToast('Link added'); renderCurriculum();
+};
+
+window.deleteLink = function(id,idx,e){
+  e.stopPropagation();
+  if(state.notes&&state.notes[id]&&state.notes[id].links){state.notes[id].links.splice(idx,1); scheduleSave(); renderCurriculum();}
+};
+
+window.markDone = function(id,e){
+  e.stopPropagation();
+  const today=new Date().toISOString().slice(0,10);
+  if(!state.done)state.done={};
+  if(state.done[id])delete state.done[id]; else state.done[id]=today;
+  scheduleSave(); renderCurriculum(); renderDashboard();
+  showToast(state.done[id]?'✓ Topic marked as done!':'Marked as undone');
+};
+
+function flashMsg(elId){const el=document.getElementById(elId);if(!el)return;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800);}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+let calYear, calMonth, currentMood='';
+
+function initCalendar(){
+  const d=new Date(); calYear=d.getFullYear(); calMonth=d.getMonth();
+  document.getElementById('logDate').value=d.toISOString().slice(0,10);
+  loadDayLog(); renderCalendar();
+}
+
+window.calPrev=function(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();};
+window.calNext=function(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();};
+
+function renderCalendar(){
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthLabel').textContent=months[calMonth]+' '+calYear;
+  const grid=document.getElementById('calGrid');
+  let html=['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-day-hdr">${d}</div>`).join('');
+  const first=new Date(calYear,calMonth,1).getDay();
+  const days=new Date(calYear,calMonth+1,0).getDate();
+  const prevDays=new Date(calYear,calMonth,0).getDate();
+  const today=new Date().toISOString().slice(0,10);
+  for(let i=0;i<first;i++) html+=`<div class="cal-cell other-month">${prevDays-first+i+1}</div>`;
+  for(let d=1;d<=days;d++){
+    const key=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasLog=!!(state.dayLogs&&state.dayLogs[key]&&state.dayLogs[key].summary);
+    const doneOnDay=Object.entries(state.done||{}).filter(([,v])=>v===key);
+    const isToday=key===today;
+    const dotHtml=doneOnDay.slice(0,3).map(([tid])=>{const t=topicById(tid);return t?`<div class="dot" style="background:${TRACK_INFO[t.track].color}"></div>`:'';}).join('');
+    html+=`<div class="cal-cell${hasLog||doneOnDay.length?' has-activity':''}${isToday?' today':''}" onclick="selectDay('${key}')">${d}<div class="dots">${dotHtml}</div></div>`;
+  }
+  const remaining=42-first-days;
+  for(let i=1;i<=remaining;i++) html+=`<div class="cal-cell other-month">${i}</div>`;
+  grid.innerHTML=html;
+}
+
+window.selectDay=function(key){document.getElementById('logDate').value=key;loadDayLog();};
+window.setMood=function(m){currentMood=m;document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('selected',b.textContent===m));};
+
+function loadDayLog(){
+  const key=document.getElementById('logDate').value;
+  const log=(state.dayLogs||{})[key]||{};
+  document.getElementById('dailySummary').value=log.summary||'';
+  currentMood=log.mood||'';
+  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('selected',b.textContent===currentMood));
+  renderCompletedToday(key);
+}
+
+window.saveDayLog=function(){
+  const key=document.getElementById('logDate').value;
+  if(!state.dayLogs)state.dayLogs={};
+  if(!state.dayLogs[key])state.dayLogs[key]={};
+  state.dayLogs[key].summary=document.getElementById('dailySummary').value;
+  state.dayLogs[key].mood=currentMood;
+  scheduleSave(); showToast('Day log saved ✓'); renderCalendar();
+};
+
+function renderCompletedToday(key){
+  const el=document.getElementById('completedTodayList');
+  const done=Object.entries(state.done||{}).filter(([,v])=>v===key).map(([id])=>topicById(id)).filter(Boolean);
+  if(!done.length){el.innerHTML='<div class="empty-state" style="padding:12px 0">No topics completed on this date yet.</div>';return;}
+  el.innerHTML=done.map(t=>`<div class="ct-row"><div class="ct-dot" style="background:${TRACK_INFO[t.track].color}"></div><span class="ct-name">${t.title}</span><span class="ct-track" style="background:${TRACK_INFO[t.track].light};color:${TRACK_INFO[t.track].color}">${TRACK_INFO[t.track].label}</span></div>`).join('');
+}
+</script>
+</body>
+</html>
